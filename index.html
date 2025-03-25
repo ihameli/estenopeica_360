@@ -1,0 +1,280 @@
+html>
+<head>
+/* 
+Credits:
+
+WebGL visualization:
+  Federico Marino 
+  J. Ignacio Alvarez-Hamelin 
+
+Photos:
+  J. Ignacio Alvarez-Hamelin (R) all rights reserved)
+
+*/
+    <style>
+
+
+        body { margin: 0; font-family: sans-serif; }
+        canvas { width: 100%; height: 100% }
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        #instructions {
+            width: 100%;
+            height: 100%;
+
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+
+            text-align: center;
+            font-size: 14px;
+            cursor: pointer;
+            color:white;
+        }
+    </style>
+
+</head>
+<body>
+    <div id="blocker">
+        <div id="instructions">
+            <p style="font-size:36px">
+                Click to move camera
+            </p>
+
+        </div>
+    </div>
+    <script type="importmap">
+        {
+          "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+            
+          }
+        }
+      </script>
+
+    <script type="module">
+
+
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+
+        //import * as THREE from 'https://unpkg.com/three@latest/build/three.module.js';
+        //import { PointerLockControls } from 'https://unpkg.com/three@latest/examples/jsm/controls/PointerLockControls.js';
+
+        let camera, scene, renderer;
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+
+        const strech_factor=0.73;
+
+        const textures={};    
+
+        function loadTextures(){  
+
+            const manager = new THREE.LoadingManager();
+                    
+
+            ["01.jpg", "02.jpg", "03.jpg", "04.jpg"].forEach((filename, index) => {
+
+                const textureLoader = new THREE.TextureLoader(manager);
+                textureLoader.load(filename, (texture) => {
+                    textures[filename] = texture;
+                });
+            }); 
+
+            manager.onLoad = function ( ) {
+                start();
+            };
+
+        }
+
+
+        function init() {
+            // Configurar escena
+            scene = new THREE.Scene();
+            
+            // Crear cámara perspectiva
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth*0.8/window.innerHeight, 0.1, 100000);
+            camera.position.set(0, 0, 0.01);
+
+            // Crear esfera para panorama
+            const geometry = new THREE.SphereGeometry(9000, 600, 400);
+            geometry.scale(-1, 1, 1); // Invertir para ver desde adentro
+
+
+
+            //const sphere = new THREE.Mesh(geometry, material);
+            //scene.add(sphere);
+
+            // Configurar renderizador WebGL
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Control de movimiento con mouse
+            /*
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            */
+
+
+            // grid
+            const grid = new THREE.GridHelper(50,16 );
+            grid.position.y=-10;
+            scene.add(grid );   
+            const controls = new PointerLockControls( camera, document.body );
+            const blocker = document.getElementById( 'blocker' );
+
+
+            const instructions = document.getElementById( 'instructions' );
+            instructions.addEventListener( 'click', function () {
+
+            controls.lock();
+
+            } );
+
+            controls.addEventListener( 'lock', function () {
+
+            instructions.style.display = 'none';
+            blocker.style.display = 'none';
+
+            } );
+
+            controls.addEventListener( 'unlock', function () {
+
+            blocker.style.display = 'block';
+            instructions.style.display = '';
+
+            } );
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function buildStrip(){  
+
+            // build a triangles strip with buffer geometry of width, height and a number of horizontal segments
+            const width = 10;
+            const height = 10;
+            const horizontalSegments = 1000;
+            const geometry = new THREE.BufferGeometry();
+
+            
+
+            let vertexData=[];
+            let uvsData=[];
+
+            
+            for (let i=0; i<horizontalSegments; i++) {
+
+                let d0=i/horizontalSegments;
+                let d1=(i+1)/horizontalSegments;
+
+                let x0=width*(-0.5+d0);
+                let x1=width*(-0.5+d1);
+
+                let scaleY0=(1-strech_factor)+strech_factor*Math.pow(Math.abs(d0-0.5),1.8);
+                //let scaleY0=(1-strech_factor)+strech_factor*Math.exp(Math.abs(d0-0.5));
+                let scaleY1=(1-strech_factor)+strech_factor*Math.pow(Math.abs(d1-0.5),1.8);
+                //let scaleY1=(1-strech_factor)+strech_factor*Math.exp(Math.abs(d1-0.5));
+                let y00=(-height/2)*scaleY0;
+                let y01=(height/2)*scaleY0; 
+                let y10=(-height/2)*scaleY1; 
+                let y11=(height/2)*scaleY1; 
+
+                vertexData.push(x0,y00,0);
+                vertexData.push(x0,y01,0);
+                vertexData.push(x1,y10,0);
+
+                vertexData.push(x1,y10,0);
+                vertexData.push(x0,y01,0);
+                vertexData.push(x1,y11,0);
+
+                uvsData.push(d0,0);
+                uvsData.push(d0,1);
+                uvsData.push(d1,0);
+
+                uvsData.push(d1,0);
+                uvsData.push(d0,1);
+                uvsData.push(d1,1);
+                
+
+            };
+
+            const vertices = new Float32Array(vertexData);  
+            const uvs= new Float32Array(uvsData);
+
+                        // itemSize = 3 because there are 3 values (components) per vertex
+            geometry.setAttribute( 'position', new THREE.BufferAttribute( vertices, 3 ) );
+            geometry.setAttribute( 'uv', new THREE.BufferAttribute( uvs, 2) );
+            const material = new THREE.MeshBasicMaterial( { color: 0xffffff ,wireframe:true} );
+            const mesh = new THREE.Mesh( geometry, material );
+
+            return mesh
+        }
+
+
+
+        function buildScene(){  
+
+
+            const verticalScale=2;
+            let r=5;
+
+            for (let i = 0 ;i<4 ;i++){  
+
+                let a=-i*Math.PI/2;
+                let z=Math.cos(a)*r;
+                let x=Math.sin(a)*r;
+                let strip=buildStrip();            
+                strip.position.set(x,0,z);
+                strip.rotation.y=a+Math.PI;
+                strip.scale.y=verticalScale;
+                strip.material= new THREE.MeshBasicMaterial( { 
+                    color: 0xfffffff,
+                    side:THREE.DoubleSide,
+                    wireframe:false ,
+                    map:textures["0"+(i+1)+".jpg"]
+                });
+                scene.add( strip );            
+            }
+
+            
+
+
+            
+
+        }
+      
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+
+        loadTextures();
+
+        function start(){
+            init();
+            buildScene();
+            animate();
+
+        }
+    </script>
+
+
+</body>
+</html>
