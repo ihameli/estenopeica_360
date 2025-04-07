@@ -1,6 +1,6 @@
-html>
+<html>
 <head>
-<!-  
+<!--
 Credits:
 
 WebGL visualization:
@@ -20,7 +20,8 @@ Photos:
             position: absolute;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            background-color: rgba(1,0,0,0.5);
+            display: none;
         }
         #instructions {
             width: 100%;
@@ -36,6 +37,39 @@ Photos:
             cursor: pointer;
             color:white;
         }
+        #splash {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0,0,0,0.0);
+            display: none;
+        }
+        #splash button {
+            padding: 40px 60px;
+            font-size: 50px;
+            color: white;
+            background-color: #007BFF;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 20px;
+            
+        }
+        #debugger {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            padding: 10px;   
+            background-color: rgba(0,0,0,0.5);
+            color: white;
+            font-size: 20px;
+            overflow-y: auto;
+            font-size: 50px;
+            display: none;
+        }
     </style>
 
 </head>
@@ -45,8 +79,15 @@ Photos:
             <p style="font-size:36px">
                 Click to move camera
             </p>
-
         </div>
+    </div>
+
+    <div id="splash">
+        <button class="touchpad">Use touchpad</button><br>
+        <button class="orientation">Use orientation</button>
+    </div>
+    <div id="debugger">
+
     </div>
     <script type="importmap">
         {
@@ -58,221 +99,355 @@ Photos:
         }
       </script>
 
+    <!-- Agregar el script de isMobile -->
+    <script src="https://cdn.jsdelivr.net/npm/mobile-detect@1.4.5/mobile-detect.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.9.0/dist/nipplejs.min.js"></script>
+
     <script type="module">
-
-
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
-
-        //import * as THREE from 'https://unpkg.com/three@latest/build/three.module.js';
-        //import { PointerLockControls } from 'https://unpkg.com/three@latest/examples/jsm/controls/PointerLockControls.js';
-
         let camera, scene, renderer;
-        let isDragging = false;
-        let previousMousePosition = { x: 0, y: 0 };
+        let joystickManager;
 
-        const strech_factor=0.73;
+        const strech_factor = 0.73;
+        const textures = {};
+        const blocker = document.getElementById('blocker');
+        const splash = document.getElementById('splash');
+        const debug = document.getElementById('debugger');
+        splash.querySelector('button.touchpad').addEventListener('click', onClickTouchpad);
+        splash.querySelector('button.orientation').addEventListener('click', onClickOrientation);
 
-        const textures={};    
+        const APP={};
 
-        function loadTextures(){  
+        const joystickState = {
 
+        };
+
+        const mobileOrientation = {
+            beta: 0,
+            gamma: 0,
+            alpha: 0
+        };
+
+        const params = {
+            deviceOrientationPermission: false,
+            isMobile: false
+        };
+        
+
+        function loadTextures(onCompleteCallback) {
             const manager = new THREE.LoadingManager();
-                    
 
             ["01.jpg", "02.jpg", "03.jpg", "04.jpg"].forEach((filename, index) => {
-
                 const textureLoader = new THREE.TextureLoader(manager);
                 textureLoader.load(filename, (texture) => {
                     textures[filename] = texture;
                 });
-            }); 
+            });
 
-            manager.onLoad = function ( ) {
-                start();
+            manager.onLoad = function () {
+                onCompleteCallback();
+                console.log("Texturas cargadas");
             };
-
         }
 
+        function checkMobile() {
+            const md = new MobileDetect(window.navigator.userAgent);
+            if (md.mobile()) {
+                console.log("Dispositivo móvil detectado");
+                params.isMobile = true;
+                splash.style.display = 'flex'; // Mostrar la pantalla de inicio en dispositivos móviles
+            } else {
+                console.log("Dispositivo de escritorio detectado");
+                params.isMobile = false;                       
 
-        function init() {
-            // Configurar escena
-            scene = new THREE.Scene();
-            
-            // Crear cámara perspectiva
-            camera = new THREE.PerspectiveCamera(55, window.innerWidth*0.8/window.innerHeight, 0.1, 100000);
-            camera.position.set(0, 0, 0.01);
+                loadTextures(requestPermissionAndStart);
+            }
+        }
 
-            // Crear esfera para panorama
-            const geometry = new THREE.SphereGeometry(9000, 600, 400);
-            geometry.scale(-1, 1, 1); // Invertir para ver desde adentro
+        function setupThreeJs(){
 
-
-
-            //const sphere = new THREE.Mesh(geometry, material);
-            //scene.add(sphere);
-
-            // Configurar renderizador WebGL
             renderer = new THREE.WebGLRenderer();
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // Control de movimiento con mouse
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth * 0.8 / window.innerHeight, 0.1, 100000);
+            camera.rotation.order = "YXZ";
+            camera.position.set(0, 0, 0.01);
+            camera.lookAt(0, 0, -1);
+
+
             /*
-            document.addEventListener('mousedown', onMouseDown);
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
+            const grid = new THREE.GridHelper(50, 16);
+            grid.position.y = -10;
+            scene.add(grid);
             */
 
-
-            // grid
-            const grid = new THREE.GridHelper(50,16 );
-            grid.position.y=-10;
-            scene.add(grid );   
-            const controls = new PointerLockControls( camera, document.body );
-            const blocker = document.getElementById( 'blocker' );
-
-
-            const instructions = document.getElementById( 'instructions' );
-            instructions.addEventListener( 'click', function () {
-
-            controls.lock();
-
-            } );
-
-            controls.addEventListener( 'lock', function () {
-
-            instructions.style.display = 'none';
-            blocker.style.display = 'none';
-
-            } );
-
-            controls.addEventListener( 'unlock', function () {
-
-            blocker.style.display = 'block';
-            instructions.style.display = '';
-
-            } );
+            const sphereGeo= new THREE.SphereGeometry(200, 32, 32);
+            const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0x999999, wireframe: true });
+            const sphere = new THREE.Mesh(sphereGeo, sphereMaterial);
+            sphere.position.set(0, 0, -0);
+            scene.add(sphere);
 
             window.addEventListener('resize', onWindowResize);
+            onWindowResize();
+            console.log("Setup Three.js completado");
+
         }
 
-        function buildStrip(){  
+        function init() {
 
-            // build a triangles strip with buffer geometry of width, height and a number of horizontal segments
+            
+            let text="";
+            if (params.isMobile) {
+                
+                text+= "Dispositivo móvil detectado\n";
+                if ( params.deviceOrientationPermission && params.useTouchpad==false) {
+                    console.log("Giroscopio presente");
+                    setupGyroscope(); // Configurar controles con giroscopio
+                    text+="<br>Giroscopio presente";
+                } else {
+                    console.log("Joystick activado");
+                    setupJoystick(); // Configurar joystick para móviles
+                    text+= "<br>Joystick activado";
+                }
+                
+            } else {
+                text+= "<br>Dispositivo de escritorio detectado\n";
+                console.log("PointerLockControls activado");
+                blocker.style.display = 'block'; // Ocultar el bloqueador en móviles
+                setupPointerLockControls(); // Configurar PointerLockControls para escritorio
+
+            }
+
+            text+="<br>permisos de giroscopio: " + params.deviceOrientationPermission + "\n";
+            debug.innerHTML = text;
+        }
+
+        function setupPointerLockControls() {
+            const controls = new PointerLockControls(camera, document.body);
+            const instructions = document.getElementById('instructions');
+
+            instructions.addEventListener('click', function () {
+                controls.lock();
+            });
+
+            controls.addEventListener('lock', function () {
+                instructions.style.display = 'none';
+                blocker.style.display = 'none';
+            });
+
+            controls.addEventListener('unlock', function () {
+                blocker.style.display = 'block';
+                instructions.style.display = '';
+            });
+        }
+
+        function requestPermissionAndStart() {
+
+                    
+        params.deviceOrientationPermission = true;
+        let text="";
+        if (typeof DeviceOrientationEvent.requestPermission === "function") {
+            
+            // If it is go ahead and call it. It returns a promise.
+            DeviceOrientationEvent.requestPermission().then(
+                function (permissionState) {
+                    if (permissionState === "granted")      params.deviceOrientationPermission = true;                                        
+                    else if (permissionState === "denied")  params.deviceOrientationPermission = false;                                                    
+                    text="Permisos de giroscopio: " + params.deviceOrientationPermission + "\n";
+                }).catch(function (error) { 
+                    params.deviceOrientationPermission = false;                
+                }
+            );
+
+        } else {                
+            params.deviceOrientationPermission = true;                
+        }
+        debug.innerHTML+= text;
+        start();
+        }
+
+        function onClickTouchpad() {
+        splash.style.display = 'none';
+
+        params.useTouchpad=true;            
+        document.removeEventListener('click', onClickTouchpad);
+        loadTextures(start);
+        }        
+
+        function onClickOrientation() {
+        splash.style.display = 'none';            
+        params.useTouchpad=false;
+        document.removeEventListener('click', onClickOrientation);
+        loadTextures(requestPermissionAndStart);
+        }        
+
+        function setupJoystick() {
+            const joystickContainer = document.createElement('div');
+            joystickContainer.style.position = 'absolute';
+            joystickContainer.style.bottom = '30px';
+            joystickContainer.style.left = '30px';
+            joystickContainer.style.width = '150px';
+            joystickContainer.style.height = '150px';
+            document.body.appendChild(joystickContainer);
+
+            joystickManager = nipplejs.create({
+                zone: joystickContainer,
+                mode: 'static',
+                position: { left: '100px', bottom: '100px' },
+                color: 'white',
+                size: 200
+            });
+
+            joystickManager.on('move', (evt, data) => {
+                if (data.direction) {
+                    joystickState.turn = data.vector.x * 0.05;
+                    joystickState.pitch = -data.vector.y * 0.01;
+                }
+            });
+
+            joystickManager.on('end', (evt, data) => {
+                joystickState.turn = 0;
+                joystickState.pitch = 0;
+            });
+        }
+
+        function setupGyroscope() {
+            window.addEventListener('deviceorientation', (event) => {
+                const { alpha,beta, gamma } = event; // beta: inclinación hacia adelante/atrás, gamma: inclinación lateral
+                
+                mobileOrientation.alpha = alpha;
+                mobileOrientation.beta = beta;
+                mobileOrientation.gamma = gamma;
+
+            });
+        }
+
+        function buildStrip() {
             const width = 10;
             const height = 10;
             const horizontalSegments = 1000;
             const geometry = new THREE.BufferGeometry();
 
-            
+            let vertexData = [];
+            let uvsData = [];
 
-            let vertexData=[];
-            let uvsData=[];
+            for (let i = 0; i < horizontalSegments; i++) {
+                let d0 = i / horizontalSegments;
+                let d1 = (i + 1) / horizontalSegments;
 
-            
-            for (let i=0; i<horizontalSegments; i++) {
+                let x0 = width * (-0.5 + d0);
+                let x1 = width * (-0.5 + d1);
 
-                let d0=i/horizontalSegments;
-                let d1=(i+1)/horizontalSegments;
+                let scaleY0 = (1 - strech_factor) + strech_factor * Math.pow(Math.abs(d0 - 0.5), 1.8);
+                let scaleY1 = (1 - strech_factor) + strech_factor * Math.pow(Math.abs(d1 - 0.5), 1.8);
+                let y00 = (-height / 2) * scaleY0;
+                let y01 = (height / 2) * scaleY0;
+                let y10 = (-height / 2) * scaleY1;
+                let y11 = (height / 2) * scaleY1;
 
-                let x0=width*(-0.5+d0);
-                let x1=width*(-0.5+d1);
+                vertexData.push(x0, y00, 0);
+                vertexData.push(x0, y01, 0);
+                vertexData.push(x1, y10, 0);
 
-                let scaleY0=(1-strech_factor)+strech_factor*Math.pow(Math.abs(d0-0.5),1.8);
-                //let scaleY0=(1-strech_factor)+strech_factor*Math.exp(Math.abs(d0-0.5));
-                let scaleY1=(1-strech_factor)+strech_factor*Math.pow(Math.abs(d1-0.5),1.8);
-                //let scaleY1=(1-strech_factor)+strech_factor*Math.exp(Math.abs(d1-0.5));
-                let y00=(-height/2)*scaleY0;
-                let y01=(height/2)*scaleY0; 
-                let y10=(-height/2)*scaleY1; 
-                let y11=(height/2)*scaleY1; 
+                vertexData.push(x1, y10, 0);
+                vertexData.push(x0, y01, 0);
+                vertexData.push(x1, y11, 0);
 
-                vertexData.push(x0,y00,0);
-                vertexData.push(x0,y01,0);
-                vertexData.push(x1,y10,0);
+                uvsData.push(d0, 0);
+                uvsData.push(d0, 1);
+                uvsData.push(d1, 0);
 
-                vertexData.push(x1,y10,0);
-                vertexData.push(x0,y01,0);
-                vertexData.push(x1,y11,0);
-
-                uvsData.push(d0,0);
-                uvsData.push(d0,1);
-                uvsData.push(d1,0);
-
-                uvsData.push(d1,0);
-                uvsData.push(d0,1);
-                uvsData.push(d1,1);
-                
-
-            };
-
-            const vertices = new Float32Array(vertexData);  
-            const uvs= new Float32Array(uvsData);
-
-                        // itemSize = 3 because there are 3 values (components) per vertex
-            geometry.setAttribute( 'position', new THREE.BufferAttribute( vertices, 3 ) );
-            geometry.setAttribute( 'uv', new THREE.BufferAttribute( uvs, 2) );
-            const material = new THREE.MeshBasicMaterial( { color: 0xffffff ,wireframe:true} );
-            const mesh = new THREE.Mesh( geometry, material );
-
-            return mesh
-        }
-
-
-
-        function buildScene(){  
-
-
-            const verticalScale=2;
-            let r=5;
-
-            for (let i = 0 ;i<4 ;i++){  
-
-                let a=-i*Math.PI/2;
-                let z=Math.cos(a)*r;
-                let x=Math.sin(a)*r;
-                let strip=buildStrip();            
-                strip.position.set(x,0,z);
-                strip.rotation.y=a+Math.PI;
-                strip.scale.y=verticalScale;
-                strip.material= new THREE.MeshBasicMaterial( { 
-                    color: 0xfffffff,
-                    side:THREE.DoubleSide,
-                    wireframe:false ,
-                    map:textures["0"+(i+1)+".jpg"]
-                });
-                scene.add( strip );            
+                uvsData.push(d1, 0);
+                uvsData.push(d0, 1);
+                uvsData.push(d1, 1);
             }
 
-            
+            const vertices = new Float32Array(vertexData);
+            const uvs = new Float32Array(uvsData);
 
+            geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+            geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+            const material = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
+            const mesh = new THREE.Mesh(geometry, material);
 
-            
-
+            return mesh;
         }
-      
+
+        function buildScene() {
+            const verticalScale = 2;
+            let r = 5;
+
+            for (let i = 0; i < 4; i++) {
+                let a = -i * Math.PI / 2;
+                let z = Math.cos(a) * r;
+                let x = Math.sin(a) * r;
+                let strip = buildStrip();
+                strip.position.set(x, 0, z);
+                strip.rotation.y = a + Math.PI;
+                strip.scale.y = verticalScale;
+                strip.material = new THREE.MeshBasicMaterial({
+                    color: 0xfffffff,
+                    side: THREE.DoubleSide,
+                    wireframe: false,
+                    map: textures["0" + (i + 1) + ".jpg"]
+                });
+                scene.add(strip);
+            }
+            console.log("Escena construida");
+        }
+
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
+        function updateCamera() {
+            if (joystickState.turn) {
+                camera.rotation.y -= joystickState.turn;
+            }
+            if (joystickState.pitch) {
+                camera.rotation.x -= joystickState.pitch;
+                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+            }
+
+            if (params.deviceOrientationPermission) {
+                if (mobileOrientation.alpha) {
+                                       
+                    camera.rotation.y = THREE.MathUtils.degToRad(mobileOrientation.alpha);
+                    //console.log("alpha: " + mobileOrientation.alpha);
+                }
+                if (mobileOrientation.beta) {
+                    camera.rotation.x = THREE.MathUtils.degToRad(mobileOrientation.beta-90);
+                    camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+                    //console.log("beta: " + mobileOrientation.beta);
+                }
+                
+            }
+            
+        }
+
         function animate() {
             requestAnimationFrame(animate);
+            updateCamera();
             renderer.render(scene, camera);
         }
 
-
-        loadTextures();
-
-        function start(){
+        function start() {
             init();
-            buildScene();
-            animate();
-
+            buildScene();            
         }
+
+        checkMobile();
+        setupThreeJs();
+        animate();
+
     </script>
 
 
