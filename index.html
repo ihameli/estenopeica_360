@@ -8,7 +8,7 @@ WebGL visualization:
   J. Ignacio Alvarez-Hamelin 
 
 Photos:
-  J. Ignacio Alvarez-Hamelin (R) all rights reserved)  
+  J. Ignacio Alvarez-Hamelin (R) all rights reserved)   
 --->
 
 <style>
@@ -460,45 +460,74 @@ Photos:
             });
         }
 
-        function buildStrip() {
-            const width = 10;
-            const height = 10;
-            const horizontalSegments = 1000;
-            const geometry = new THREE.BufferGeometry();
+       function buildStrip(images) {
+  // Supone 4 imágenes de igual dimensión
+  const singleW = images[0].width;
+  const singleH = images[0].height;
 
-            let vertexData = [];
-            let uvsData = [];
+  // Canvas final para la tira completa 360° (4 fotos de ancho)
+  const stripCanvas = document.createElement('canvas');
+  stripCanvas.width = singleW * images.length;
+  stripCanvas.height = singleH;
+  const stripCtx = stripCanvas.getContext('2d');
 
-            for (let i = 0; i < horizontalSegments; i++) {
-                let d0 = i / horizontalSegments;
-                let d1 = (i + 1) / horizontalSegments;
+  // FOV horizontal de cada foto en grados (360° / 4 fotos = 90°)
+  const fovGrados = 360 / images.length;
+  const maxTheta = (fovGrados * Math.PI / 180) / 2;
+  const halfW = singleW / 2;
+  const halfH = singleH / 2;
 
-                let x0 = width * (-0.5 + d0);
-                let x1 = width * (-0.5 + d1);
+  // Procesamos cada una de las 4 imágenes
+  images.forEach((img, imgIndex) => {
+    // Canvas auxiliar para la foto actual
+    const auxCanvas = document.createElement('canvas');
+    auxCanvas.width = singleW;
+    auxCanvas.height = singleH;
+    const auxCtx = auxCanvas.getContext('2d');
+    auxCtx.drawImage(img, 0, 0);
 
-                let scaleY0 = (1 - strech_factor) + strech_factor * Math.pow(Math.abs(d0 - 0.5), 1.8);
-                let scaleY1 = (1 - strech_factor) + strech_factor * Math.pow(Math.abs(d1 - 0.5), 1.8);
-                let y00 = (-height / 2) * scaleY0;
-                let y01 = (height / 2) * scaleY0;
-                let y10 = (-height / 2) * scaleY1;
-                let y11 = (height / 2) * scaleY1;
+    const srcData = auxCtx.getImageData(0, 0, singleW, singleH);
+    const dstCanvas = document.createElement('canvas');
+    dstCanvas.width = singleW;
+    dstCanvas.height = singleH;
+    const dstCtx = dstCanvas.getContext('2d');
+    const dstData = dstCtx.createImageData(singleW, singleH);
 
-                vertexData.push(x0, y00, 0);
-                vertexData.push(x0, y01, 0);
-                vertexData.push(x1, y10, 0);
+    const srcPixels = srcData.data;
+    const dstPixels = dstData.data;
 
-                vertexData.push(x1, y10, 0);
-                vertexData.push(x0, y01, 0);
-                vertexData.push(x1, y11, 0);
+    // Corrección geométrica de lata cilíndrica
+    for (let x = 0; x < singleW; x++) {
+      const normX = (x - halfW) / halfW;
+      const theta = normX * maxTheta;
+      const cosTheta = Math.cos(theta); // Factor de deformación de la lata
 
-                uvsData.push(d0, 0);
-                uvsData.push(d0, 1);
-                uvsData.push(d1, 0);
+      for (let y = 0; y < singleH; y++) {
+        const yDistFromCenter = y - halfH;
+        const srcY = Math.round(halfH + (yDistFromCenter * cosTheta));
 
-                uvsData.push(d1, 0);
-                uvsData.push(d0, 1);
-                uvsData.push(d1, 1);
-            }
+        const dstIdx = (y * singleW + x) * 4;
+
+        if (srcY >= 0 && srcY < singleH) {
+          const srcIdx = (srcY * singleW + x) * 4;
+          dstPixels[dstIdx]     = srcPixels[srcIdx];     // R
+          dstPixels[dstIdx + 1] = srcPixels[srcIdx + 1]; // G
+          dstPixels[dstIdx + 2] = srcPixels[srcIdx + 2]; // B
+          dstPixels[dstIdx + 3] = srcPixels[srcIdx + 3]; // A
+        } else {
+          dstPixels[dstIdx + 3] = 0; // Transparente fuera de bordes
+        }
+      }
+    }
+
+    dstCtx.putImageData(dstData, 0, 0);
+
+    // Dibujamos la foto corregida en la posición correspondiente del strip
+    stripCtx.drawImage(dstCanvas, imgIndex * singleW, 0);
+  });
+
+  return stripCanvas;
+}
 
             const vertices = new Float32Array(vertexData);
             const uvs = new Float32Array(uvsData);
