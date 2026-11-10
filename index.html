@@ -13,41 +13,46 @@ Photos:
 
 <style>
 #cartel-info {
-  position: fixed;
-  bottom: 30px; /* Posicionado abajo */
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.85);
-  color: #ffffff;
-  padding: 16px 24px; /* Tamaño del cartel más amplio */
-  border-radius: 24px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 17px; /* Texto más grande */
-  line-height: 1.4;
-  text-align: center;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(10px);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  max-width: 90vw;
-  width: fit-content;
-}
-  
-#btn-cerrar-cartel {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
+  position: fixed !important;
+  bottom: 30px !important; /* Lo fuerza abajo */
+  top: auto !important;     /* Anula cualquier posicionamiento superior previo */
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 999999 !important; /* Queda sobre cualquier otra capa */
+
+  background: rgba(0, 0, 0, 0.9) !important;
+  color: #ffffff !important;
+  padding: 20px 24px !important; /* Cartel más amplio */
+  border-radius: 20px !important;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 20px !important; /* Texto significativamente más grande */
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  text-align: center !important;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(12px) !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+
+  width: 90% !important; /* Ocupa el 90% del ancho del celular */
+  max-width: 500px !important;
+  box-sizing: border-box !important;
 }
 
-#btn-cerrar-cartel:hover {
-  color: #ffffff;
+#btn-cerrar-cartel {
+  background: transparent !important;
+  border: none !important;
+  color: #ffffff !important;
+  font-size: 30px !important; /* Cruz de cierre grande y fácil de presionar */
+  font-weight: bold !important;
+  cursor: pointer !important;
+  padding: 0 6px !important;
+  line-height: 1 !important;
 }
 </style>
 <!-- Botón necesario para solicitar permiso en móviles (especialmente iOS) -->
