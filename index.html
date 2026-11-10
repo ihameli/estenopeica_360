@@ -8,9 +8,69 @@ WebGL visualization:
   J. Ignacio Alvarez-Hamelin 
 
 Photos:
-  J. Ignacio Alvarez-Hamelin (R) all rights reserved)
-
+  J. Ignacio Alvarez-Hamelin (R) all rights reserved)  
 --->
+<!-- Botón necesario para solicitar permiso en móviles (especialmente iOS) -->
+<button id="btn-sensores" style="position: fixed; top: 10px; left: 10px; z-index: 1000; padding: 10px 15px; font-size: 16px;">
+  Activar Vista 360° con Movimiento
+</button>
+
+
+<script>
+  const btnSensores = document.getElementById('btn-sensores');
+
+  // Función que escucha la orientación del dispositivo
+  function activarGiroscopio() {
+    window.addEventListener('deviceorientation', (event) => {
+      // event.alpha indica la rotación en el eje Z (brújula/dirección) de 0 a 360 grados
+      let angulo = event.alpha;
+
+      if (angulo !== null && angulo !== undefined) {
+        rotarEscena(angulo);
+      }
+    });
+  }
+
+  // Función para aplicar la rotación a la escena 360
+  function rotarEscena(angulo) {
+    // -------------------------------------------------------------
+    // Opción 1: Si utilizas un contenedor 3D CSS (por ejemplo, un cubo/cilindro)
+    // -------------------------------------------------------------
+    const contenedor = document.getElementById('visor-360'); // Cambia 'visor-360' por el ID de tu contenedor
+    if (contenedor) {
+      contenedor.style.transform = `rotateY(${-angulo}deg)`;
+    }
+
+    // -------------------------------------------------------------
+    // Opción 2: Si cambias entre las 4 fotos según el ángulo (cada 90°)
+    // -------------------------------------------------------------
+    /*
+    const indiceFoto = Math.floor((angulo % 360) / 90); // Devuelve 0, 1, 2 o 3
+    mostrarFoto(indiceFoto);
+    */
+  }
+
+  // Gestión de permisos al presionar el botón
+  btnSensores.addEventListener('click', () => {
+    // Verificación para dispositivos iOS 13+
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(permissionState => {
+          if (permissionState === 'granted') {
+            btnSensores.style.display = 'none'; // Oculta el botón tras dar permiso
+            activarGiroscopio();
+          } else {
+            alert('Permiso para acceder a los sensores denegado.');
+          }
+        })
+        .catch(console.error);
+    } else {
+      // Dispositivos Android o navegadores estándar
+      btnSensores.style.display = 'none';
+      activarGiroscopio();
+    }
+  });
+</script>
     <style>
 
 
